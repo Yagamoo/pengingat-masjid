@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Kabupaten;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Http;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $response = Http::get('https://api.myquran.com/v2/sholat/kota/semua');
+        foreach ($response->json()['data'] as $kota) {
+            Kabupaten::updateOrCreate(
+                ['api_id' => $kota['id']],
+                ['nama' => $kota['lokasi']]
+            );
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->call([PesanSeeder::class]);
+        $this->call([MasyarakatSeeder::class]);
     }
 }

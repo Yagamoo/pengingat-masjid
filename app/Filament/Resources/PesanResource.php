@@ -6,10 +6,14 @@ use App\Filament\Resources\PesanResource\Pages;
 use App\Filament\Resources\PesanResource\RelationManagers;
 use App\Models\Pesan;
 use Filament\Forms;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Closure;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\BooleanColumn;
@@ -31,22 +35,40 @@ class PesanResource extends Resource
                 Select::make('waktu')
                     ->label('Waktu Sholat')
                     ->options([
+                        'imsak' => 'Imsak',
                         'subuh' => 'Subuh',
+                        'terbit' => 'Terbit',
+                        'dhuha' => 'Dhuha',
                         'dzuhur' => 'Dzuhur',
                         'ashar' => 'Ashar',
                         'maghrib' => 'Maghrib',
                         'isya' => 'Isya',
                     ])
                     ->required()
+                    ->reactive()
+                    ->afterStateUpdated(function (Set $set, $state) {
+                        $templateSebelum = "Bismillah<br>Assalamu'alaikum,<br>15 menit lagi menuju waktu {$state} untuk wilayah {{lokasi}}<br><br>Jadwal Sholat Hari Ini:<br>Subuh: {{subuh}}<br>Dzuhur: {{dzuhur}}<br>Ashar: {{ashar}}<br>Maghrib: {{maghrib}}<br>Isya: {{isya}}<br><br>Mari kita bersiap untuk menunaikan sholat {$state}<br>Selamat menunaikan ibadah 🤲<br><br>ketik [unlist] untuk berhenti menerima pesan";
+
+                        $templateMasuk = "Bismillah<br>Assalamu'alaikum,<br>Waktu {$state} telah tiba di wilayah {{lokasi}}<br><br>Jadwal Sholat Hari Ini:<br>Subuh: {{subuh}}<br>Dzuhur: {{dzuhur}}<br>Ashar: {{ashar}}<br>Maghrib: {{maghrib}}<br>Isya: {{isya}}<br><br>Mari kita laksanakan sholat {$state}<br>Semoga Allah menerima ibadah kita 🤲<br><br>ketik [unlist] untuk berhenti menerima pesan";
+
+                        $set('pesan_sebelum', $templateSebelum);
+                        $set('pesan', $templateMasuk);
+                    })
                     ->columnSpanFull(),
-                Textarea::make('pesan_sebelum')
+                RichEditor::make('pesan_sebelum')
                     ->label('Pesan Sebelum')
                     ->required()
-                    ->columnSpanFull(),
-                Textarea::make('pesan')
+                    ->columnSpanFull()
+                    ->helperText('Jangan ubah {{lokasi}}, {{subuh}}, {{dzuhur}}, {{ashar}}, {{maghrib}}, {{isya}} sebagai placeholder.')
+                    ->toolbarButtons(['bold', 'italic', 'underline', 'bulletList', 'h2', 'h3']),
+                    
+                RichEditor::make('pesan')
                     ->label('Pesan')
                     ->required()
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->helperText('Jangan ubah {{lokasi}}, {{subuh}}, {{dzuhur}}, {{ashar}}, {{maghrib}}, {{isya}} sebagai placeholder.')
+                    ->toolbarButtons(['bold', 'italic', 'underline', 'bulletList', 'h2', 'h3']),
+
                 Toggle::make('aktif')
                     ->label('Aktif')
                     ->default(true),

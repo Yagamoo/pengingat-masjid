@@ -23,23 +23,31 @@ class KirimPesanSholat extends Command
         $now = Carbon::now()->format('H:i');
 
         foreach ($masyarakatList as $orang) {
-            $jadwal = $this->getJadwalSholat($orang->kabupaten->api_id, now()->toDateString());
-            if (!$jadwal)
+            $jadwal = $this->getJadwalSholat($orang->kabupaten->api_id, Carbon::now()->toDateString());
+            if (!$jadwal) {
                 continue;
-
-            foreach (['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as $waktu) {
+            }
+            
+            foreach (['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'] as $waktu) {
                 $jamSholat = Carbon::parse($jadwal[$waktu]);
                 $jamSholatString = $jamSholat->format('H:i');
-                $sebelum10Menit = $jamSholat->copy()->subMinutes(10)->format('H:i');
-
+                $sebelum10Menit = $jamSholat->copy()->subMinutes(15)->format('H:i');
+                
                 $pesan = Pesan::where('waktu', $waktu)->where('aktif', true)->first();
-                if (!$pesan)
+                if (!$pesan) {
                     continue;
+                }
+                
+                // Kirim pesan 10 menit sebelum waktu sholat
+                if ($now === $sebelum10Menit && !empty($pesan->pesan_sebelum)) {
+                    $pesanSiap = $this->gantiPlaceholder($pesan->pesan_sebelum, $waktu, $jadwal, $orang);
+                    $this->sendNotification($orang->no_hp, $pesanSiap);
+                }
 
-                if ($now == $sebelum10Menit && $pesan->pesan_sebelum) {
-                    $this->sendNotification($orang->no_hp, $pesan->pesan_sebelum);
-                } elseif ($now == $jamSholatString && $pesan->pesan_masuk) {
-                    $this->sendNotification($orang->no_hp, $pesan->pesan_masuk);
+                // Kirim pesan saat waktu sholat tiba
+                if ($now === $jamSholatString && !empty($pesan->pesan)) {
+                    $pesanSiap = $this->gantiPlaceholder($pesan->pesan, $waktu, $jadwal, $orang);
+                    $this->sendNotification($orang->no_hp, $pesanSiap);
                 }
             }
         }
@@ -54,9 +62,32 @@ class KirimPesanSholat extends Command
         return $response->successful() ? $response->json()['data']['jadwal'] ?? null : null;
     }
 
+    private function gantiPlaceholder($template, $waktu, $jadwal, $orang)
+    {
+        $replace = [
+            '{{waktu}}' => ucfirst($waktu),
+            '{{lokasi}}' => $orang->kabupaten->nama ?? 'wilayah Anda',
+            '{{subuh}}' => $jadwal['subuh'],
+            '{{dzuhur}}' => $jadwal['dzuhur'],
+            '{{ashar}}' => $jadwal['ashar'],
+            '{{maghrib}}' => $jadwal['maghrib'],
+            '{{isya}}' => $jadwal['isya'],
+        ];
+
+        $pesan = strtr($template, $replace);
+
+        // Ganti <br> atau <br/> jadi newline \n supaya di WA rapi
+        $pesan = preg_replace('/<br\s*\/?>/i', "\n", $pesan);
+
+        // Jika ada tag HTML lain, bisa ditambahkan sanitasi atau di-strip tags
+        $pesan = strip_tags($pesan);
+
+        return $pesan;
+    }
+
     private function sendNotification($nowa, $pesan)
     {
-        $token = '##tZKBP_Dp_gHypkBQVJ'; // Ganti token Fonnte kamu
+        $token = 'LWk3d6eTgBZurFgZdKyu'; // Ganti token Fonnte kamu
         $response = Http::withHeaders([
             'Authorization' => $token,
         ])->post('https://api.fonnte.com/send', [
